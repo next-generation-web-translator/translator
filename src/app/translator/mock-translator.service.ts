@@ -1,16 +1,16 @@
 import { Observable, of } from 'rxjs';
 import { Injectable } from '@angular/core';
-import { TranslationEngine } from './translation-engine.service';
 import { TranslationResult } from './models/translation-result';
 import { TranslationType } from './models/translation.type';
+import { Translator } from './translator.service';
 
 @Injectable()
-export class MockTranslationEngine implements TranslationEngine {
-  translateHtml(id: string, html: string): Observable<TranslationResult> {
-    return of({ id, type: TranslationType.mock, content: this.translateNow(html) });
+export class MockTranslator extends Translator {
+  translateOne(id: string, html: string): Observable<TranslationResult> {
+    return of({ id, type: TranslationType.mock, content: this.translateHtml(html) });
   }
 
-  private translateNow(html: string): string {
+  private translateHtml(html: string): string {
     const dom = document.createElement('div');
     dom.innerHTML = html;
     this.translateDom(dom);

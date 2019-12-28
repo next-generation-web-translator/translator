@@ -1,7 +1,6 @@
 import { DomProcessor } from './dom-processor.service';
 import { TestBed } from '@angular/core/testing';
-import { TranslationEngine } from './translation-engine.service';
-import { MockTranslationEngine } from './mock-translation-engine.service';
+import { MockTranslator } from './mock-translator.service';
 import { Translator } from './translator.service';
 
 describe('DomProcessor', () => {
@@ -22,8 +21,7 @@ describe('DomProcessor', () => {
     TestBed.configureTestingModule({
       providers: [
         DomProcessor,
-        Translator,
-        { provide: TranslationEngine, useClass: MockTranslationEngine },
+        { provide: Translator, useClass: MockTranslator },
       ],
     });
     service = TestBed.inject(DomProcessor);

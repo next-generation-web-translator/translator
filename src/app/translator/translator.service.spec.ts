@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Translator } from './translator.service';
-import { TranslationEngine } from './translation-engine.service';
-import { MockTranslationEngine } from './mock-translation-engine.service';
+import { MockTranslator } from './mock-translator.service';
 
 describe('TranslatorService', () => {
   let service: Translator;
@@ -9,8 +8,7 @@ describe('TranslatorService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        { provide: TranslationEngine, useClass: MockTranslationEngine },
-        Translator,
+        { provide: Translator, useClass: MockTranslator },
       ],
     });
     service = TestBed.inject(Translator);
