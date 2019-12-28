@@ -72,6 +72,7 @@ export class DomProcessor implements OnDestroy {
     }
     const wrappedElement = node.cloneNode(true) as Element;
     this.wrapTextNodes(wrappedElement);
+
     this.translate$$.next({
       id: nextId(),
       url: location.href,
@@ -88,11 +89,14 @@ export class DomProcessor implements OnDestroy {
     }
     for (let i = 0; i < childrenCount; ++i) {
       const item = node.childNodes.item(i);
-      if (item.nodeType === Node.TEXT_NODE) {
+      if (isTextNode(item)) {
         const wrapped = document.createElement('span');
+        wrapped.setAttribute(attrNameOfWrapper, '');
+        wrapped.setAttribute(attrNameOfNodeId, i.toString(10));
         wrapped.textContent = item.nodeValue;
         node.replaceChild(wrapped, item);
-      } else if (item.nodeType === Node.ELEMENT_NODE) {
+      } else if (isElementNode(item)) {
+        item.setAttribute(attrNameOfNodeId, i.toString(10));
         this.wrapTextNodes(item as Element);
       }
     }
@@ -101,6 +105,14 @@ export class DomProcessor implements OnDestroy {
   private applyResult(result: TranslateResult) {
     return this.dom.querySelector(`[${attrNameOfNodeId}=${result.id}]`).innerHTML = result.content;
   }
+}
+
+function isTextNode(node: Node): node is Text {
+  return node.nodeType === Node.TEXT_NODE;
+}
+
+function isElementNode(node: Node): node is Element {
+  return node.nodeType === Node.ELEMENT_NODE;
 }
 
 let currentId = 1;
@@ -114,13 +126,6 @@ const customTranslateAttributeName = 'ngwt-translate-me';
 const attrNameOfNodeId = '__ngwt-node-id';
 const attrNameOfWrapper = '__ngwt-node-wrapper';
 export const anchorAttrName = '__ngwt-anchor-id';
-
-function wrapTextNode(node: Node): HTMLFontElement {
-  const result = document.createElement('font');
-  result.setAttribute(attrNameOfWrapper, '');
-  result.appendChild(node);
-  return result;
-}
 
 function elementIndexOf(element: Element): number {
   const parent = element.parentElement;

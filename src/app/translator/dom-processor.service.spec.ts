@@ -36,7 +36,9 @@ describe('DomProcessor', () => {
     const node = document.createElement('div');
     node.innerHTML = '1<p><a>2</a>3</p>4';
     service.wrapTextNodes(node);
-    expect(node.innerHTML).toEqual('<span>1</span><p><a>2</a><span>3</span></p><span>4</span>');
+    expect(node.innerHTML).toEqual('<span __ngwt-node-wrapper="" __ngwt-node-id="0">1</span>' +
+        '<p __ngwt-node-id="1"><a __ngwt-node-id="0">2</a><span __ngwt-node-wrapper="" __ngwt-node-id="1">3</span></p>' +
+        '<span __ngwt-node-wrapper="" __ngwt-node-id="2">4</span>');
   });
   it('translate', (done) => {
     service.setup(dom);
