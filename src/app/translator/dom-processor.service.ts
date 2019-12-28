@@ -1,10 +1,19 @@
 import { from, Subject } from 'rxjs';
 import { bufferTime, switchMap, tap } from 'rxjs/operators';
 import { TranslateEntry, TranslateResult, Translator } from './translator.service';
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
+
+function indexInParent(node: Node): number {
+  const siblings = node.parentNode.children;
+  for (let i = 0; i < siblings.length; ++i) {
+    if (siblings.item(i) === node) {
+      return i;
+    }
+  }
+}
 
 @Injectable()
-export class DomProcessor {
+export class DomProcessor implements OnDestroy {
   constructor(private translator: Translator) {
   }
 
@@ -22,10 +31,10 @@ export class DomProcessor {
         tap(result => this.applyResult(result)),
     ).subscribe();
     const targetNodes = dom.querySelectorAll(`h1,h2,h3,h4,h5,h6,p,t,[${customTranslateAttributeName}]`);
-    targetNodes.forEach(element => this.attach(element));
+    targetNodes.forEach(element => this.process(element));
   }
 
-  destroy(): void {
+  ngOnDestroy(): void {
     this.observer.disconnect();
     this.translate$$.complete();
   }
@@ -33,13 +42,13 @@ export class DomProcessor {
   observeSubtree(element: Element): void {
     this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
       mutationsList.filter(it => it.type === 'childList')
-          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(node)));
+          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.process(node)));
     });
 
     this.observer.observe(element, {attributes: true, childList: true, subtree: true});
   }
 
-  shouldAttach(node: Node): node is Element {
+  shouldTranslate(node: Node): node is Element {
     if (!(node instanceof Element)) {
       return false;
     }
@@ -53,31 +62,44 @@ export class DomProcessor {
     return node.tagName === 'T' || node.hasAttribute(customTranslateAttributeName);
   }
 
-  attach(node: Node): void {
-    if (!this.shouldAttach(node)) {
+  process(node: Node): void {
+    if (node[attrNameOfNodeId]) {
       return;
     }
-    if (node.hasAttribute(originAttrName)) {
+    node[attrNameOfNodeId] = indexInParent(node);
+    if (!this.shouldTranslate(node)) {
       return;
     }
-    const id = nextId();
-    node.setAttribute(originAttrName, id);
-    this.addTranslationAnchors(node);
-    const content = node.innerHTML;
-    this.translate$$.next({id, url: location.href, paths: getPathsTo(node), content});
+    const wrappedElement = node.cloneNode(true) as Element;
+    this.wrapTextNodes(wrappedElement);
+    this.translate$$.next({
+      id: nextId(),
+      url: location.href,
+      paths: getPathsTo(node),
+      content: wrappedElement.innerHTML,
+    });
   }
 
   // 为子元素添加一些唯一性标记，以便翻译时定位
-  addTranslationAnchors(element: Element): void {
-    for (let i = 0; i < element.children.length; ++i) {
-      const item = element.children.item(i);
-      item.setAttribute(anchorAttrName, nextId());
-      this.addTranslationAnchors(item);
+  wrapTextNodes(node: Element): void {
+    const childrenCount = node.childNodes.length;
+    if (childrenCount <= 1) {
+      return;
+    }
+    for (let i = 0; i < childrenCount; ++i) {
+      const item = node.childNodes.item(i);
+      if (item.nodeType === Node.TEXT_NODE) {
+        const wrapped = document.createElement('span');
+        wrapped.textContent = item.nodeValue;
+        node.replaceChild(wrapped, item);
+      } else if (item.nodeType === Node.ELEMENT_NODE) {
+        this.wrapTextNodes(item as Element);
+      }
     }
   }
 
   private applyResult(result: TranslateResult) {
-    return this.dom.querySelector(`[${originAttrName}=${result.id}]`).innerHTML = result.content;
+    return this.dom.querySelector(`[${attrNameOfNodeId}=${result.id}]`).innerHTML = result.content;
   }
 }
 
@@ -89,8 +111,16 @@ function nextId(): string {
 }
 
 const customTranslateAttributeName = 'ngwt-translate-me';
-const originAttrName = '__ngwt-origin-id';
+const attrNameOfNodeId = '__ngwt-node-id';
+const attrNameOfWrapper = '__ngwt-node-wrapper';
 export const anchorAttrName = '__ngwt-anchor-id';
+
+function wrapTextNode(node: Node): HTMLFontElement {
+  const result = document.createElement('font');
+  result.setAttribute(attrNameOfWrapper, '');
+  result.appendChild(node);
+  return result;
+}
 
 function elementIndexOf(element: Element): number {
   const parent = element.parentElement;

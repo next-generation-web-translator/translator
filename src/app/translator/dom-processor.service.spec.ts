@@ -32,6 +32,12 @@ describe('DomProcessor', () => {
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
+  it('should wrap text node', () => {
+    const node = document.createElement('div');
+    node.innerHTML = '1<p><a>2</a>3</p>4';
+    service.wrapTextNodes(node);
+    expect(node.innerHTML).toEqual('<span>1</span><p><a>2</a><span>3</span></p><span>4</span>');
+  });
   it('translate', (done) => {
     service.setup(dom);
     setTimeout(() => {
