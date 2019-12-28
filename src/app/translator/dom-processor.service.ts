@@ -17,7 +17,7 @@ export class DomProcessor implements OnDestroy {
   setup(dom: Element = document.body): void {
     this.dom = dom;
     this.translate$$.pipe(
-        bufferTime(100),
+        bufferTime(100, undefined, 50),
         switchMap((entries) => this.translator.translate(entries)),
         switchMap(results => from(results)),
         tap(result => this.applyResult(result)),
