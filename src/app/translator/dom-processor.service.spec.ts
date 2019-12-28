@@ -1,7 +1,7 @@
 import { DomProcessor } from './dom-processor.service';
 import { TestBed } from '@angular/core/testing';
-import { TranslateEngine } from './translate-engine.service';
-import { FakeTranslateEngine } from './fake-translate-engine';
+import { TranslationEngine } from './translation-engine.service';
+import { MockTranslationEngine } from './mock-translation-engine.service';
 import { Translator } from './translator.service';
 
 describe('DomProcessor', () => {
@@ -23,7 +23,7 @@ describe('DomProcessor', () => {
       providers: [
         DomProcessor,
         Translator,
-        {provide: TranslateEngine, useClass: FakeTranslateEngine},
+        { provide: TranslationEngine, useClass: MockTranslationEngine },
       ],
     });
     service = TestBed.inject(DomProcessor);
@@ -50,13 +50,13 @@ describe('DomProcessor', () => {
   it('should add translation markers (one node)', () => {
     const node = document.createElement('div');
     node.innerHTML = '<p>1</p>';
-    service.addTranslationMarker(node);
+    service.addNodeIndex(node);
     expect(node.innerHTML).toEqual('<p __ngwt-node-index="_0">1</p>');
   });
   it('should add translation markers (multiple nodes)', () => {
     const node = document.createElement('div');
     node.innerHTML = '<span>1</span><p><a>2</a><span>3</span></p><span>4</span>';
-    service.addTranslationMarker(node);
+    service.addNodeIndex(node);
     expect(node.innerHTML).toEqual('<span __ngwt-node-index="_0">1</span>' +
         '<p __ngwt-node-index="_1"><a __ngwt-node-index="_0">2</a><span __ngwt-node-index="_1">3</span></p>' +
         '<span __ngwt-node-index="_2">4</span>');

@@ -1,36 +1,19 @@
-import { from, Observable, of, zip } from 'rxjs';
-import { map, switchMap, toArray } from 'rxjs/operators';
+import { from, Observable } from 'rxjs';
+import { switchMap, toArray } from 'rxjs/operators';
 import { Injectable } from '@angular/core';
-import { TranslateEngine } from './translate-engine.service';
+import { TranslationEngine } from './translation-engine.service';
+import { TranslationEntry } from './models/translation-entry';
+import { TranslationResult } from './models/translation-result';
 
 @Injectable()
 export class Translator {
-  constructor(private engine: TranslateEngine) {
+  constructor(private engine: TranslationEngine) {
   }
 
-  translate(entries: TranslateEntry[]): Observable<TranslateResult[]> {
+  translate(entries: TranslationEntry[]): Observable<TranslationResult[]> {
     return from(entries).pipe(
-        switchMap(({id, content}) => zip(of(id), this.engine.translateHtml(content))),
-        map(([id, content]) => ({id, type: TranslatorType.ai, content})),
+        switchMap(({ id, content }) => this.engine.translateHtml(id, content)),
         toArray(),
     );
   }
-}
-
-export interface TranslateEntry {
-  id: string;
-  url: string;
-  paths: string[];
-  content: string;
-}
-
-export enum TranslatorType {
-  lookup = 'lookup',
-  ai = 'ai',
-}
-
-export interface TranslateResult {
-  id: string;
-  type: TranslatorType;
-  content: string;
 }

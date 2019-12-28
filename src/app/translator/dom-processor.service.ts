@@ -1,7 +1,9 @@
 import { from, Subject } from 'rxjs';
 import { bufferTime, switchMap, tap } from 'rxjs/operators';
-import { TranslateEntry, TranslateResult, Translator } from './translator.service';
+import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
+import { TranslationEntry } from './models/translation-entry';
+import { TranslationResult } from './models/translation-result';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -10,19 +12,24 @@ export class DomProcessor implements OnDestroy {
 
   private dom: Element;
   private observer: MutationObserver;
-  private translate$$ = new Subject<TranslateEntry>();
+  private translate$$ = new Subject<TranslationEntry>();
 
   setup(dom: Element = document.body): void {
     this.dom = dom;
-    this.observeSubtree(dom);
     this.translate$$.pipe(
         bufferTime(100),
         switchMap((entries) => this.translator.translate(entries)),
         switchMap(results => from(results)),
         tap(result => this.applyResult(result)),
     ).subscribe();
-    const targetNodes = dom.querySelectorAll(`h1,h2,h3,h4,h5,h6,p,t,[${customTranslateAttributeName}]`);
-    targetNodes.forEach(element => this.process(element));
+
+    this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
+      mutationsList.filter(it => it.type === 'childList')
+          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(node)));
+    });
+    this.observer.observe(dom, { attributes: true, childList: true, subtree: true });
+    dom.querySelectorAll(`h1,h2,h3,h4,h5,h6,p,t,[${customTranslateAttributeName}]`)
+        .forEach(element => this.attach(element));
   }
 
   ngOnDestroy(): void {
@@ -32,17 +39,8 @@ export class DomProcessor implements OnDestroy {
     this.translate$$.complete();
   }
 
-  observeSubtree(element: Element): void {
-    this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
-      mutationsList.filter(it => it.type === 'childList')
-          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.process(node)));
-    });
-
-    this.observer.observe(element, {attributes: true, childList: true, subtree: true});
-  }
-
   shouldTranslate(node: Node): node is Element {
-    if (!(node instanceof Element)) {
+    if (!isElementNode(node)) {
       return false;
     }
     if (node instanceof HTMLParagraphElement) {
@@ -55,60 +53,63 @@ export class DomProcessor implements OnDestroy {
     return node.tagName === 'T' || node.hasAttribute(customTranslateAttributeName);
   }
 
-  process(node: Node): void {
-    if (node[attrNameOfNodeIndex]) {
+  attach(node: Node): void {
+    if (!this.shouldTranslate(node)) {
       return;
     }
-    node[attrNameOfNodeIndex] = indexInParent(node);
-    if (!this.shouldTranslate(node)) {
+
+    if (node.hasAttribute(attrNameOfMarker)) {
       return;
     }
 
     const id = nextId();
     node.setAttribute(attrNameOfMarker, id);
 
-    const wrappedElement = node.cloneNode(true) as Element;
-    this.wrapTextNodes(wrappedElement);
-    this.addTranslationMarker(wrappedElement);
+    const elementToWrap = node.cloneNode(true) as Element;
+    this.wrapTextNodes(elementToWrap);
+    this.addNodeIndex(elementToWrap);
 
     this.translate$$.next({
       id,
       url: location.href,
       paths: getPathsTo(node),
-      content: wrappedElement.innerHTML,
+      content: elementToWrap.innerHTML,
     });
   }
 
   wrapTextNodes(node: Element): void {
-    const childrenCount = node.childNodes.length;
-    if (childrenCount <= 1) {
+    if (!isCompoundNode(node)) {
       return;
     }
-    for (let i = 0; i < childrenCount; ++i) {
-      const item = node.childNodes.item(i);
-      if (isTextNode(item)) {
+    for (let i = 0; i < node.childNodes.length; ++i) {
+      const childNode = node.childNodes.item(i);
+      if (isTextNode(childNode)) {
         const wrapped = document.createElement('span');
         wrapped.setAttribute(attrNameOfWrapper, '');
-        wrapped.textContent = item.nodeValue;
-        node.replaceChild(wrapped, item);
-      } else if (isElementNode(item)) {
-        this.wrapTextNodes(item as Element);
+        wrapped.textContent = childNode.nodeValue;
+        node.replaceChild(wrapped, childNode);
+      } else if (isElementNode(childNode)) {
+        this.wrapTextNodes(childNode as Element);
       }
     }
   }
 
-  addTranslationMarker(root: Element): void {
+  addNodeIndex(root: Element): void {
     root.setAttribute(attrNameOfNodeIndex, `_${indexInParent(root)}`);
     for (let i = 0; i < root.children.length; ++i) {
-      this.addTranslationMarker(root.children.item(i));
+      this.addNodeIndex(root.children.item(i));
     }
   }
 
-  private applyResult(result: TranslateResult): void {
-    const originNode = this.dom.querySelector(`[${attrNameOfMarker}=${result.id}]`);
+  private applyResult(result: TranslationResult): void {
+    const originNode = this.findOriginNode(result.id);
     const translationNode = document.createElement('div');
     translationNode.innerHTML = result.content;
     this.mergeDom(originNode, translationNode);
+  }
+
+  private findOriginNode(resultId: string): Element {
+    return this.dom.querySelector(`[${attrNameOfMarker}=${resultId}]`);
   }
 
   private mergeDom(originRoot: Node, translationRoot: Element): void {
@@ -137,6 +138,10 @@ function isElementNode(node: Node): node is Element {
   return node.nodeType === Node.ELEMENT_NODE;
 }
 
+function isCompoundNode(node: Element) {
+  return node.childNodes.length > 1;
+}
+
 let currentId = 1;
 
 function nextId(): string {
@@ -144,7 +149,7 @@ function nextId(): string {
   return '_' + currentId.toString(10);
 }
 
-const customTranslateAttributeName = 'ngwt-translate-me';
+const customTranslateAttributeName = '__ngwt-translate-me';
 const attrNameOfNodeIndex = '__ngwt-node-index';
 const attrNameOfWrapper = '__ngwt-node-wrapper';
 const attrNameOfMarker = '__ngwt-node-marker';
@@ -159,6 +164,7 @@ function indexInParent(node: Node): number {
       return i;
     }
   }
+  return -1;
 }
 
 function getPathsTo(element: Element): string[] {

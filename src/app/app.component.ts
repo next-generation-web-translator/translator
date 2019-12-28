@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { DomProcessor } from './translator/dom-processor.service';
-import { TranslateEngine } from './translator/translate-engine.service';
-import { FakeTranslateEngine } from './translator/fake-translate-engine';
+import { MockTranslationEngine } from './translator/mock-translation-engine.service';
 import { Translator } from './translator/translator.service';
+import { TranslationEngine } from './translator/translation-engine.service';
 
 @Component({
   selector: 'ngwt-translator',
@@ -11,7 +11,7 @@ import { Translator } from './translator/translator.service';
   providers: [
     DomProcessor,
     Translator,
-    { provide: TranslateEngine, useClass: FakeTranslateEngine },
+    { provide: TranslationEngine, useClass: MockTranslationEngine },
   ],
 })
 export class AppComponent implements OnInit {
