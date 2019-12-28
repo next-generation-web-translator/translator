@@ -11,7 +11,7 @@ import { Translator } from './translator/translator.service';
   providers: [
     DomProcessor,
     Translator,
-    {provide: TranslateEngine, useClass: FakeTranslateEngine},
+    { provide: TranslateEngine, useClass: FakeTranslateEngine },
   ],
 })
 export class AppComponent implements OnInit {
