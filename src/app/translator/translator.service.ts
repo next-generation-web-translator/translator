@@ -11,7 +11,7 @@ export class Translator {
   translate(entries: TranslateEntry[]): Observable<TranslateResult[]> {
     return from(entries).pipe(
         switchMap(({id, content}) => zip(of(id), this.engine.translateHtml(content))),
-        map(([id, content]) => ({id, content})),
+        map(([id, content]) => ({id, type: TranslatorType.ai, content})),
         toArray(),
     );
   }
@@ -24,7 +24,13 @@ export interface TranslateEntry {
   content: string;
 }
 
+export enum TranslatorType {
+  lookup = 'lookup',
+  ai = 'ai',
+}
+
 export interface TranslateResult {
   id: string;
+  type: TranslatorType;
   content: string;
 }

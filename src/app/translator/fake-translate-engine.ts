@@ -1,5 +1,4 @@
 import { Observable, of } from 'rxjs';
-import { anchorAttrName } from './dom-processor.service';
 import { TranslateEngine } from './translate-engine.service';
 import { Injectable } from '@angular/core';
 
@@ -10,18 +9,19 @@ export class FakeTranslateEngine implements TranslateEngine {
   }
 
   private translateNow(html: string): string {
-    if (html.startsWith('One')) {
-      return `一<span ${anchorAttrName}="3">一</span>`;
-    }
+    const dom = document.createElement('div');
+    dom.innerHTML = html;
+    this.translateDom(dom);
+    return dom.innerHTML;
+  }
 
-    if (html.startsWith('Two')) {
-      return `二`;
+  private translateDom(dom: Element): void {
+    if (dom.children.length === 0) {
+      dom.textContent = '中' + dom.textContent;
+    } else {
+      for (let i = 0; i < dom.children.length; ++i) {
+        this.translateDom(dom.children.item(i));
+      }
     }
-
-    if (html.startsWith('Three')) {
-      return `三<span ${anchorAttrName}="6">三</span>`;
-    }
-
-    return html;
   }
 }
