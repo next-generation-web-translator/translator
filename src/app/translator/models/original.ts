@@ -1,4 +1,4 @@
-export interface TranslationEntry {
+export interface Original {
   id: string;
   url: string;
   paths: string[];

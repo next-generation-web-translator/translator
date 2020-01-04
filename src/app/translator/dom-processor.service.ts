@@ -2,8 +2,8 @@ import { from, Subject } from 'rxjs';
 import { bufferTime, switchMap, tap } from 'rxjs/operators';
 import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
-import { TranslationEntry } from './models/translation-entry';
-import { TranslationResult } from './models/translation-result';
+import { Original } from './models/original';
+import { Translation } from './models/translation';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -12,7 +12,7 @@ export class DomProcessor implements OnDestroy {
 
   private dom: Element;
   private observer: MutationObserver;
-  private translate$$ = new Subject<TranslationEntry>();
+  private translate$$ = new Subject<Original>();
 
   setup(dom: Element = document.body): void {
     this.dom = dom;
@@ -101,31 +101,31 @@ export class DomProcessor implements OnDestroy {
     }
   }
 
-  private applyResult(result: TranslationResult): void {
-    const originNode = this.findOriginNode(result.id);
+  private applyResult(result: Translation): void {
+    const originalNode = this.findOriginalNode(result.id);
     const translationNode = document.createElement('div');
     translationNode.innerHTML = result.content;
-    this.mergeDom(originNode, translationNode);
+    this.mergeDom(originalNode, translationNode);
   }
 
-  private findOriginNode(resultId: string): Element {
+  private findOriginalNode(resultId: string): Element {
     return this.dom.querySelector(`[${attrNameOfMarker}=${resultId}]`);
   }
 
-  private mergeDom(originRoot: Node, translationRoot: Element): void {
+  private mergeDom(originalRoot: Node, translationRoot: Element): void {
     if (translationRoot.children.length === 0) {
       if (translationRoot.hasAttribute(attrNameOfWrapper)) {
-        originRoot.nodeValue = translationRoot.textContent;
+        originalRoot.nodeValue = translationRoot.textContent;
       } else {
-        originRoot.textContent = translationRoot.textContent;
+        originalRoot.textContent = translationRoot.textContent;
       }
       return;
     }
     for (let i = 0; i < translationRoot.children.length; ++i) {
       const translationNode = translationRoot.children.item(i);
       const index = +translationNode.getAttribute(attrNameOfNodeIndex).slice(1);
-      const originNode = originRoot.childNodes[index];
-      this.mergeDom(originNode, translationNode);
+      const originalNode = originalRoot.childNodes[index];
+      this.mergeDom(originalNode, translationNode);
     }
   }
 }

@@ -1,14 +1,14 @@
 import { from, Observable } from 'rxjs';
 import { Injectable } from '@angular/core';
-import { TranslationResult } from './models/translation-result';
-import { TranslationType } from './models/translation.type';
+import { Translation } from './models/translation';
+import { TranslationType } from './models/translation-type';
 import { Translator } from './translator.service';
-import { TranslationEntry } from './models/translation-entry';
+import { Original } from './models/original';
 import { map, toArray } from 'rxjs/operators';
 
 @Injectable()
 export class MockTranslator extends Translator {
-  translate(entries: TranslationEntry[]): Observable<TranslationResult[]> {
+  translate(entries: Original[]): Observable<Translation[]> {
     return from(entries).pipe(
         map(({ id, content }) => ({ id, type: TranslationType.mock, content: this.translateHtml(content) })),
         toArray(),

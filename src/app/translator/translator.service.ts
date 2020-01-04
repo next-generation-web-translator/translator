@@ -1,7 +1,7 @@
 import { Observable } from 'rxjs';
-import { TranslationEntry } from './models/translation-entry';
-import { TranslationResult } from './models/translation-result';
+import { Original } from './models/original';
+import { Translation } from './models/translation';
 
 export abstract class Translator {
-  abstract translate(entries: TranslationEntry[]): Observable<TranslationResult[]>;
+  abstract translate(entries: Original[]): Observable<Translation[]>;
 }
