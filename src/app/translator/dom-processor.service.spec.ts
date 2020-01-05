@@ -41,23 +41,23 @@ describe('DomProcessor', () => {
     const node = document.createElement('div');
     node.innerHTML = '1<p><a>2</a>3</p>4';
     service.wrapTextNodes(node);
-    expect(node.innerHTML).toEqual('<span __ngwt-node-wrapper="">1</span>' +
-        '<p><a>2</a><span __ngwt-node-wrapper="">3</span></p>' +
-        '<span __ngwt-node-wrapper="">4</span>');
+    expect(node.innerHTML).toEqual('<span __text="">1</span>' +
+        '<p><a>2</a><span __text="">3</span></p>' +
+        '<span __text="">4</span>');
   });
   it('should add translation markers (one node)', () => {
     const node = document.createElement('div');
     node.innerHTML = '<p>1</p>';
     service.addNodeIndex(node);
-    expect(node.innerHTML).toEqual('<p __ngwt-node-index="_0">1</p>');
+    expect(node.innerHTML).toEqual('<p __index="_0">1</p>');
   });
   it('should add translation markers (multiple nodes)', () => {
     const node = document.createElement('div');
     node.innerHTML = '<span>1</span><p><a>2</a><span>3</span></p><span>4</span>';
     service.addNodeIndex(node);
-    expect(node.innerHTML).toEqual('<span __ngwt-node-index="_0">1</span>' +
-        '<p __ngwt-node-index="_1"><a __ngwt-node-index="_0">2</a><span __ngwt-node-index="_1">3</span></p>' +
-        '<span __ngwt-node-index="_2">4</span>');
+    expect(node.innerHTML).toEqual('<span __index="_0">1</span>' +
+        '<p __index="_1"><a __index="_0">2</a><span __index="_1">3</span></p>' +
+        '<span __index="_2">4</span>');
   });
   it('translate', (done) => {
     service.setup(dom);
