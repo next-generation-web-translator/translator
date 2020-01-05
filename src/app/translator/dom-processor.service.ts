@@ -142,10 +142,8 @@ export class DomProcessor implements OnDestroy {
   }
 
   private clearAttributes(elementToWrap: Element): void {
-    for (let i = 0; i < elementToWrap.attributes.length; ++i) {
-      const attr = elementToWrap.attributes.item(i);
-      elementToWrap.removeAttributeNS(attr.namespaceURI, attr.name);
-    }
+    const names = Array.from(elementToWrap.attributes).map(it => [it.namespaceURI, it.name]);
+    names.forEach(([namespaceURI, name]) => elementToWrap.removeAttributeNS(namespaceURI, name));
     for (let i = 0; i < elementToWrap.children.length; ++i) {
       this.clearAttributes(elementToWrap.children.item(i));
     }
