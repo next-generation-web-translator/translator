@@ -204,5 +204,5 @@ function generateFingerprint(node: Element, html: string) {
 }
 
 function toUrlSafe(value: string): string {
-  return value.replace('+', '-').replace('/', '_').replace('=', '');
+  return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
