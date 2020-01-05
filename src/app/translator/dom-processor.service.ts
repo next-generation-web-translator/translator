@@ -1,9 +1,11 @@
-import { from, Subject } from 'rxjs';
-import { bufferTime, switchMap, tap } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+import { catchError, mergeMap, tap } from 'rxjs/operators';
 import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
 import { OriginalModel } from './models/original.model';
 import { TranslationModel } from './models/translation.model';
+import * as hash from 'object-hash';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -17,9 +19,17 @@ export class DomProcessor implements OnDestroy {
   setup(dom: Element = document.body): void {
     this.dom = dom;
     this.translate$$.pipe(
-        bufferTime(100, undefined, 50),
-        switchMap((entries) => this.translator.translate(entries)),
-        switchMap(results => from(results)),
+        mergeMap((original) => {
+          return this.translator.query(original).pipe(
+              catchError((error: HttpErrorResponse) => {
+                if (error.status === 404) {
+                  return this.translator.create(original);
+                } else {
+                  throw error;
+                }
+              }),
+          );
+        }),
         tap(result => this.applyResult(result)),
     ).subscribe();
 
@@ -62,17 +72,19 @@ export class DomProcessor implements OnDestroy {
       return;
     }
 
-    const id = nextId();
-    node.setAttribute(attrNameOfMarker, id);
-
     const elementToWrap = node.cloneNode(true) as Element;
+    // 移除所有属性，以免干扰匹配
+    this.clearAttributes(elementToWrap);
     this.wrapTextNodes(elementToWrap);
     this.addNodeIndex(elementToWrap);
+
+    const id = generateFingerprint(node, elementToWrap.innerHTML);
+    node.setAttribute(attrNameOfMarker, id);
 
     this.translate$$.next({
       id,
       pageUri: location.href,
-      xpath: getPathsTo(node),
+      xpath: getPathsTo(node).join('/'),
       original: elementToWrap.innerHTML,
     });
   }
@@ -85,7 +97,7 @@ export class DomProcessor implements OnDestroy {
       const childNode = node.childNodes.item(i);
       if (isTextNode(childNode)) {
         const wrapped = document.createElement('span');
-        wrapped.setAttribute(attrNameOfWrapper, '');
+        wrapped.setAttribute(attrNameOfTextWrapper, '');
         wrapped.textContent = childNode.nodeValue;
         node.replaceChild(wrapped, childNode);
       } else if (isElementNode(childNode)) {
@@ -109,12 +121,12 @@ export class DomProcessor implements OnDestroy {
   }
 
   private findOriginalNode(resultId: string): Element {
-    return this.dom.querySelector(`[${attrNameOfMarker}=${resultId}]`);
+    return this.dom.querySelector(`[${attrNameOfMarker}="${resultId}"]`);
   }
 
   private mergeDom(originalRoot: Node, translationRoot: Element): void {
     if (translationRoot.children.length === 0) {
-      if (translationRoot.hasAttribute(attrNameOfWrapper)) {
+      if (translationRoot.hasAttribute(attrNameOfTextWrapper)) {
         originalRoot.nodeValue = translationRoot.textContent;
       } else {
         originalRoot.textContent = translationRoot.textContent;
@@ -126,6 +138,16 @@ export class DomProcessor implements OnDestroy {
       const index = +translationNode.getAttribute(attrNameOfNodeIndex).slice(1);
       const originalNode = originalRoot.childNodes[index];
       this.mergeDom(originalNode, translationNode);
+    }
+  }
+
+  private clearAttributes(elementToWrap: Element): void {
+    for (let i = 0; i < elementToWrap.attributes.length; ++i) {
+      const attr = elementToWrap.attributes.item(i);
+      elementToWrap.removeAttributeNS(attr.namespaceURI, attr.name);
+    }
+    for (let i = 0; i < elementToWrap.children.length; ++i) {
+      this.clearAttributes(elementToWrap.children.item(i));
     }
   }
 }
@@ -150,9 +172,9 @@ function nextId(): string {
 }
 
 const customTranslateAttributeName = '__ngwt-translate-me';
-const attrNameOfNodeIndex = '__ngwt-node-index';
-const attrNameOfWrapper = '__ngwt-node-wrapper';
-const attrNameOfMarker = '__ngwt-node-marker';
+const attrNameOfNodeIndex = '__index';
+const attrNameOfTextWrapper = '__text';
+const attrNameOfMarker = '__marker';
 
 function indexInParent(node: Node): number {
   if (!node.parentNode) {
@@ -167,9 +189,20 @@ function indexInParent(node: Node): number {
   return -1;
 }
 
-function getPathsTo(element: Element): string {
+function getPathsTo(element: Element): string[] {
   if (element === document.body) {
-    return '';
+    return [];
   }
-  return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)].join('/');
+  return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)];
+}
+
+function generateFingerprint(node: Element, html: string) {
+  return toUrlSafe(hash(`${location.href}\n${getPathsTo(node).join('/')}\n${html}`, {
+    encoding: 'base64',
+    algorithm: 'sha1',
+  }));
+}
+
+function toUrlSafe(value: string): string {
+  return value.replace('+', '-').replace('/', '_').replace('=', '');
 }

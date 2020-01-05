@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "ng serve --proxy-config=./proxy-config.js",
     "build": "ng build --prod",
     "test": "ng test",
     "lint": "ng lint",
@@ -20,6 +20,7 @@
     "@angular/platform-browser": "~9.0.0-rc.7",
     "@angular/platform-browser-dynamic": "~9.0.0-rc.7",
     "@angular/router": "~9.0.0-rc.7",
+    "object-hash": "^2.0.1",
     "rxjs": "~6.5.3",
     "tslib": "^1.10.0",
     "word2vec": "^1.1.4",
