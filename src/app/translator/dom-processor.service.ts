@@ -2,8 +2,8 @@ import { from, Subject } from 'rxjs';
 import { bufferTime, switchMap, tap } from 'rxjs/operators';
 import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
-import { Original } from './models/original';
-import { Translation } from './models/translation';
+import { OriginalModel } from './models/original.model';
+import { TranslationModel } from './models/translation.model';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -12,7 +12,7 @@ export class DomProcessor implements OnDestroy {
 
   private dom: Element;
   private observer: MutationObserver;
-  private translate$$ = new Subject<Original>();
+  private translate$$ = new Subject<OriginalModel>();
 
   setup(dom: Element = document.body): void {
     this.dom = dom;
@@ -71,9 +71,9 @@ export class DomProcessor implements OnDestroy {
 
     this.translate$$.next({
       id,
-      url: location.href,
-      paths: getPathsTo(node),
-      content: elementToWrap.innerHTML,
+      pageUri: location.href,
+      xpath: getPathsTo(node),
+      original: elementToWrap.innerHTML,
     });
   }
 
@@ -101,10 +101,10 @@ export class DomProcessor implements OnDestroy {
     }
   }
 
-  private applyResult(result: Translation): void {
+  private applyResult(result: TranslationModel): void {
     const originalNode = this.findOriginalNode(result.id);
     const translationNode = document.createElement('div');
-    translationNode.innerHTML = result.content;
+    translationNode.innerHTML = result.translation;
     this.mergeDom(originalNode, translationNode);
   }
 
@@ -167,9 +167,9 @@ function indexInParent(node: Node): number {
   return -1;
 }
 
-function getPathsTo(element: Element): string[] {
+function getPathsTo(element: Element): string {
   if (element === document.body) {
-    return [];
+    return '';
   }
-  return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)];
+  return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)].join('/');
 }
