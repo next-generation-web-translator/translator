@@ -19,18 +19,16 @@ export class DomProcessor implements OnDestroy {
   setup(dom: Element = document.body): void {
     this.dom = dom;
     this.translate$$.pipe(
-        mergeMap((original) => {
-          return this.translator.query(original).pipe(
-              catchError((error: HttpErrorResponse) => {
-                if (error.status === 404) {
-                  return this.translator.create(original);
-                } else {
-                  throw error;
-                }
-              }),
-          );
-        }),
-        tap(result => this.applyResult(result)),
+        mergeMap((original) => this.translator.query(original).pipe(
+            catchError((error: HttpErrorResponse) => {
+              if (error.status === 404) {
+                return this.translator.create(original);
+              } else {
+                throw error;
+              }
+            }),
+            tap((result) => this.applyResult(result)),
+        )),
     ).subscribe();
 
     this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
