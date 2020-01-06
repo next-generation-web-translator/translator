@@ -70,11 +70,7 @@ export class DomProcessor implements OnDestroy {
       return;
     }
 
-    const elementToWrap = node.cloneNode(true) as Element;
-    // 移除所有属性，以免干扰匹配
-    this.clearAttributes(elementToWrap);
-    this.wrapTextNodes(elementToWrap);
-    this.addNodeIndex(elementToWrap);
+    const elementToWrap = cloneAndWrapTextNodes(node, 0);
 
     const id = generateFingerprint(node, elementToWrap.innerHTML);
     node.setAttribute(attrNameOfMarker, id);
@@ -83,32 +79,8 @@ export class DomProcessor implements OnDestroy {
       id,
       pageUri: location.href,
       xpath: getPathsTo(node).join('/'),
-      original: elementToWrap.innerHTML,
+      original: elementToWrap.innerHTML.trim(),
     });
-  }
-
-  wrapTextNodes(node: Element): void {
-    if (!isCompoundNode(node)) {
-      return;
-    }
-    for (let i = 0; i < node.childNodes.length; ++i) {
-      const childNode = node.childNodes.item(i);
-      if (isTextNode(childNode)) {
-        const wrapped = document.createElement('span');
-        wrapped.setAttribute(attrNameOfTextWrapper, '');
-        wrapped.textContent = childNode.nodeValue;
-        node.replaceChild(wrapped, childNode);
-      } else if (isElementNode(childNode)) {
-        this.wrapTextNodes(childNode as Element);
-      }
-    }
-  }
-
-  addNodeIndex(root: Element): void {
-    root.setAttribute(attrNameOfNodeIndex, `_${indexInParent(root)}`);
-    for (let i = 0; i < root.children.length; ++i) {
-      this.addNodeIndex(root.children.item(i));
-    }
   }
 
   private applyResult(result: TranslationModel): void {
@@ -134,16 +106,8 @@ export class DomProcessor implements OnDestroy {
     for (let i = 0; i < translationRoot.children.length; ++i) {
       const translationNode = translationRoot.children.item(i);
       const index = +translationNode.getAttribute(attrNameOfNodeIndex).slice(1);
-      const originalNode = originalRoot.childNodes[index];
+      const originalNode = findNodeByIndexData(originalRoot, index);
       this.mergeDom(originalNode, translationNode);
-    }
-  }
-
-  private clearAttributes(elementToWrap: Element): void {
-    const names = Array.from(elementToWrap.attributes).map(it => [it.namespaceURI, it.name]);
-    names.forEach(([namespaceURI, name]) => elementToWrap.removeAttributeNS(namespaceURI, name));
-    for (let i = 0; i < elementToWrap.children.length; ++i) {
-      this.clearAttributes(elementToWrap.children.item(i));
     }
   }
 }
@@ -152,12 +116,27 @@ function isTextNode(node: Node): node is Text {
   return node.nodeType === Node.TEXT_NODE;
 }
 
+function isAttributeNode(node: Node): node is Attr {
+  return node.nodeType === Node.ATTRIBUTE_NODE;
+}
+
+function isCommentNode(node: Node): node is Comment {
+  return node.nodeType === Node.COMMENT_NODE;
+}
+
 function isElementNode(node: Node): node is Element {
   return node.nodeType === Node.ELEMENT_NODE;
 }
 
-function isCompoundNode(node: Element) {
-  return node.childNodes.length > 1;
+function hasSibling(node: Node): boolean {
+  const parent = node.parentElement;
+  for (let i = 0; i < parent.childNodes.length; ++i) {
+    const subNode = parent.childNodes.item(i);
+    if (subNode !== node && (isTextNode(subNode) || isElementNode(subNode))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 let currentId = 1;
@@ -168,6 +147,7 @@ function nextId(): string {
 }
 
 const customTranslateAttributeName = '__ngwt-translate-me';
+const attrNameOfNodeIndexData = '__ngwt-node-index';
 const attrNameOfNodeIndex = '__index';
 const attrNameOfTextWrapper = '__text';
 const attrNameOfMarker = '__marker';
@@ -201,4 +181,36 @@ function generateFingerprint(node: Element, html: string) {
 
 function toUrlSafe(value: string): string {
   return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function findNodeByIndexData(root: Node, index: number): Node {
+  for (let i = 0; i < root.childNodes.length; ++i) {
+    const subNode = root.childNodes.item(i);
+    if (subNode[attrNameOfNodeIndexData] === index) {
+      return subNode;
+    }
+  }
+}
+
+export function cloneAndWrapTextNodes(node: Element, index: number): Element {
+  const result = document.createElement(node.tagName);
+  result.setAttribute(attrNameOfNodeIndex, `_${index}`);
+  for (let i = 0; i < node.childNodes.length; ++i) {
+    const childNode = node.childNodes.item(i);
+    childNode[attrNameOfNodeIndexData] = i;
+    if (isTextNode(childNode) && hasSibling(childNode)) {
+      const wrapped = document.createElement('span');
+      wrapped.setAttribute(attrNameOfTextWrapper, '');
+      wrapped.textContent = childNode.nodeValue;
+      wrapped.setAttribute(attrNameOfNodeIndex, `_${i}`);
+      result.appendChild(wrapped);
+    } else if (isAttributeNode(childNode) || isCommentNode(childNode)) {
+      // ignore it
+    } else if (isElementNode(childNode)) {
+      result.appendChild(cloneAndWrapTextNodes(childNode, i));
+    } else {
+      result.append(childNode);
+    }
+  }
+  return result;
 }
