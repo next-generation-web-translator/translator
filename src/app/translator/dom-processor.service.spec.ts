@@ -1,4 +1,4 @@
-import { cloneAndWrapTextNodes, DomProcessor } from './dom-processor.service';
+import { DomProcessor } from './dom-processor.service';
 import { TestBed } from '@angular/core/testing';
 import { MockTranslator } from './mock-translator.service';
 import { Translator } from './translator.service';
@@ -10,7 +10,8 @@ describe('DomProcessor', () => {
   beforeAll(() => {
     dom = document.createElement('div');
     dom.innerHTML = `<h1>One<span>1<strong>2<!----></strong>3</span><!----></h1>
-<p>Two</p>`;
+<p>Two</p>
+<div>Three <span>Four</span> Five</div>`;
     document.body.append(dom);
     h1 = dom.querySelector('h1');
     p = dom.querySelector('p');
@@ -31,19 +32,13 @@ describe('DomProcessor', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should add translation markers (one node)', () => {
-    const node = document.createElement('div');
-    node.innerHTML = '<p>1</p>';
-    const result = cloneAndWrapTextNodes(node, 0);
-    expect(result.innerHTML).toEqual('<p __index="_0">1</p>');
-  });
-  it('should add translation markers (multiple nodes)', () => {
-    const node = document.createElement('div');
-    node.innerHTML = '1<p><a>2</a>3</p>4';
-    const result = cloneAndWrapTextNodes(node, 0);
-    expect(result.innerHTML).toEqual('<span __text="" __index="_0">1</span>' +
-        '<p __index="_1"><a __index="_0">2</a><span __text="" __index="_1">3</span></p>' +
-        '<span __text="" __index="_2">4</span>');
+  it('should find all sentences', () => {
+    const elements = service.findSentences(dom);
+    expect(elements.map(it => it.innerHTML)).toEqual([
+      'One<span __index="_1">1<strong __index="1">2<!----></strong>3</span>',
+      'Two',
+      'Three <span __index="_1">Four</span> Five',
+    ]);
   });
 
   it('translate', (done) => {
@@ -54,4 +49,5 @@ describe('DomProcessor', () => {
       done();
     }, 100);
   });
+
 });

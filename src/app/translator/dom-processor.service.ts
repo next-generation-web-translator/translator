@@ -33,11 +33,10 @@ export class DomProcessor implements OnDestroy {
 
     this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
       mutationsList.filter(it => it.type === 'childList')
-          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(node)));
+          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(findSentenceLevelAncestor(node))));
     });
     this.observer.observe(dom, { attributes: true, childList: true, subtree: true });
-    dom.querySelectorAll(`h1,h2,h3,h4,h5,h6,p,t,[${customTranslateAttributeName}]`)
-        .forEach(element => this.attach(element));
+    this.attach(dom);
   }
 
   ngOnDestroy(): void {
@@ -47,40 +46,52 @@ export class DomProcessor implements OnDestroy {
     this.translate$$.complete();
   }
 
-  shouldTranslate(node: Node): node is Element {
-    if (!isElementNode(node)) {
-      return false;
-    }
-    if (node instanceof HTMLParagraphElement) {
-      return true;
-    }
-    if (node instanceof HTMLHeadingElement) {
-      return true;
-    }
-
-    return node.tagName === 'T' || node.hasAttribute(customTranslateAttributeName);
+  attach(node: Element): void {
+    const sentences = this.findSentences(node);
+    sentences.forEach(sentence => {
+      this.translate$$.next({
+        id: sentence[attrNameOfMarker],
+        pageUri: location.href,
+        xpath: getPathsTo(node).join('/'),
+        original: sentence.innerHTML.trim(),
+      });
+    });
   }
 
-  attach(node: Node): void {
-    if (!this.shouldTranslate(node)) {
-      return;
+  findSentences(dom: Element): Element[] {
+    const result: Element[] = [];
+    let segment = document.createElement(dom.tagName);
+    for (let i = 0; i < dom.childNodes.length; ++i) {
+      const node = dom.childNodes.item(i);
+      node[attrNameOfNodeIndexData] = i;
+      const clonedNode = node.cloneNode(true);
+      if (isTextNode(clonedNode) && hasSibling(clonedNode)) {
+        const wrapped = document.createElement('span');
+        wrapped.setAttribute(attrNameOfTextWrapper, '');
+        wrapped.setAttribute(attrNameOfNodeIndex, `_${i}`);
+        wrapped.append(clonedNode);
+        segment.appendChild(wrapped);
+      } else if (isElementNode(node)) {
+        if (isInlineElement(node)) {
+          (clonedNode as Element).setAttribute(attrNameOfNodeIndex, `_${i}`);
+          segment.append(clonedNode);
+        } else {
+          result.push(...this.findSentences(node));
+          const id = generateFingerprint(segment.innerHTML.trim());
+          segment.setAttribute(attrNameOfMarker, id);
+          if (segment.innerHTML.trim()) {
+            result.push(segment);
+          }
+          segment = document.createElement(node.tagName);
+        }
+      } else if (!isAttributeNode(clonedNode) && !isCommentNode(clonedNode)) {
+        segment.appendChild(clonedNode);
+      }
     }
-
-    if (node.hasAttribute(attrNameOfMarker)) {
-      return;
+    if (segment.firstChild && segment.innerHTML.trim()) {
+      result.push(segment);
     }
-
-    const elementToWrap = cloneAndWrapTextNodes(node, 0);
-
-    const id = generateFingerprint(node, elementToWrap.innerHTML);
-    node.setAttribute(attrNameOfMarker, id);
-
-    this.translate$$.next({
-      id,
-      pageUri: location.href,
-      xpath: getPathsTo(node).join('/'),
-      original: elementToWrap.innerHTML.trim(),
-    });
+    return result;
   }
 
   private applyResult(result: TranslationModel): void {
@@ -112,6 +123,12 @@ export class DomProcessor implements OnDestroy {
   }
 }
 
+function isInlineElement(node: Element): boolean {
+  const display = getComputedStyle(node).display;
+  return display === 'inline' || display === 'inline-block' || display === 'inline-flex';
+
+}
+
 function isTextNode(node: Node): node is Text {
   return node.nodeType === Node.TEXT_NODE;
 }
@@ -130,6 +147,9 @@ function isElementNode(node: Node): node is Element {
 
 function hasSibling(node: Node): boolean {
   const parent = node.parentElement;
+  if (!parent) {
+    return false;
+  }
   for (let i = 0; i < parent.childNodes.length; ++i) {
     const subNode = parent.childNodes.item(i);
     if (subNode !== node && (isTextNode(subNode) || isElementNode(subNode))) {
@@ -139,14 +159,6 @@ function hasSibling(node: Node): boolean {
   return false;
 }
 
-let currentId = 1;
-
-function nextId(): string {
-  currentId++;
-  return '_' + currentId.toString(10);
-}
-
-const customTranslateAttributeName = '__ngwt-translate-me';
 const attrNameOfNodeIndexData = '__ngwt-node-index';
 const attrNameOfNodeIndex = '__index';
 const attrNameOfTextWrapper = '__text';
@@ -172,8 +184,8 @@ function getPathsTo(element: Element): string[] {
   return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)];
 }
 
-function generateFingerprint(node: Element, html: string) {
-  return toUrlSafe(hash(`${location.href}\n${getPathsTo(node).join('/')}\n${html}`, {
+function generateFingerprint(html: string) {
+  return toUrlSafe(hash(html, {
     encoding: 'base64',
     algorithm: 'sha1',
   }));
@@ -192,25 +204,13 @@ function findNodeByIndexData(root: Node, index: number): Node {
   }
 }
 
-export function cloneAndWrapTextNodes(node: Element, index: number): Element {
-  const result = document.createElement(node.tagName);
-  result.setAttribute(attrNameOfNodeIndex, `_${index}`);
-  for (let i = 0; i < node.childNodes.length; ++i) {
-    const childNode = node.childNodes.item(i);
-    childNode[attrNameOfNodeIndexData] = i;
-    if (isTextNode(childNode) && hasSibling(childNode)) {
-      const wrapped = document.createElement('span');
-      wrapped.setAttribute(attrNameOfTextWrapper, '');
-      wrapped.textContent = childNode.nodeValue;
-      wrapped.setAttribute(attrNameOfNodeIndex, `_${i}`);
-      result.appendChild(wrapped);
-    } else if (isAttributeNode(childNode) || isCommentNode(childNode)) {
-      // ignore it
-    } else if (isElementNode(childNode)) {
-      result.appendChild(cloneAndWrapTextNodes(childNode, i));
-    } else {
-      result.append(childNode);
-    }
+function findSentenceLevelAncestor(node: Node): Element {
+  // TODO: 处理纯文本节点
+  if (!node.parentNode) {
+    return node as Element;
   }
-  return result;
+  if (isElementNode(node) && !isInlineElement(node)) {
+    return node;
+  }
+  return findSentenceLevelAncestor(node.parentNode);
 }
