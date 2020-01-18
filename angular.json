@@ -123,6 +123,10 @@
           }
         }
       }
-    }},
-  "defaultProject": "translation-ui"
+    }
+  },
+  "defaultProject": "translation-ui",
+  "cli": {
+    "analytics": false
+  }
 }
