@@ -3,11 +3,16 @@ Object.defineProperty(document, 'doctype', {
   value: '<!DOCTYPE html>',
 });
 Object.defineProperty(window, 'getComputedStyle', {
-  value: () => {
-    return {
-      display: 'none',
-      appearance: ['-webkit-appearance'],
-    };
+  value: (element: HTMLElement) => {
+    if (blockLevelTagNames.includes(element.tagName.toLowerCase())) {
+      return {
+        display: 'block',
+      };
+    } else {
+      return {
+        display: 'inline',
+      };
+    }
   },
 });
 /**
@@ -22,3 +27,34 @@ Object.defineProperty(document.body.style, 'transform', {
     };
   },
 });
+
+const blockLevelTagNames = [
+  'address',
+  'article',
+  'aside',
+  'audio',
+  'blockquote',
+  'canvas',
+  'dd',
+  'div',
+  'dl',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'header',
+  'hgroup',
+  'hr',
+  'noscript',
+  'ol',
+  'output',
+  'p',
+  'pre',
+  'section',
+  'table',
+  'tfoot',
+  'ul',
+  'video',
+];
