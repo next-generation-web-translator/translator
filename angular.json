@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "translator": {
+    "translation-ui": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -17,7 +17,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": "dist/translator",
+            "outputPath": "dist/translation-ui",
             "index": "src/index.html",
             "main": "src/main.ts",
             "polyfills": "src/polyfills.ts",
@@ -66,18 +66,18 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "translator:build"
+            "browserTarget": "translation-ui:build"
           },
           "configurations": {
             "production": {
-              "browserTarget": "translator:build:production"
+              "browserTarget": "translation-ui:build:production"
             }
           }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "translator:build"
+            "browserTarget": "translation-ui:build"
           }
         },
         "test": {
@@ -114,15 +114,15 @@
           "builder": "@angular-devkit/build-angular:protractor",
           "options": {
             "protractorConfig": "e2e/protractor.conf.js",
-            "devServerTarget": "translator:serve"
+            "devServerTarget": "translation-ui:serve"
           },
           "configurations": {
             "production": {
-              "devServerTarget": "translator:serve:production"
+              "devServerTarget": "translation-ui:serve:production"
             }
           }
         }
       }
     }},
-  "defaultProject": "translator"
+  "defaultProject": "translation-ui"
 }
