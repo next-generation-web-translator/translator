@@ -61,7 +61,7 @@ export class DomProcessor implements OnDestroy {
     }
     attachNodeIndexToData(node);
     const sentences = gatherSentences(cloneAndWrapText(node) as Element);
-    sentences.forEach(sentence => {
+    sentences.filter(it => it.hasAttribute(attrNameOfMarker) && !!it.innerHTML.trim()).forEach(sentence => {
       this.translate$$.next({
         id: sentence.getAttribute(attrNameOfMarker),
         pageUri: location.href,
@@ -140,7 +140,9 @@ export function gatherSentences(dom: Element): Element[] {
   let sentence = document.createElement('div');
   const parent = findFirstBlockLevelAncestor(dom);
   const id = parent[attrNameOfMarker];
-  sentence.setAttribute(attrNameOfMarker, id);
+  if (id) {
+    sentence.setAttribute(attrNameOfMarker, id);
+  }
   while (node) {
     if (!isElementNode(node) || ['inline', 'inline-flex', 'inline-block'].includes(node.getAttribute(attrNameOfNodeDisplay))) {
       sentence.appendChild(node.cloneNode(true));
@@ -170,7 +172,9 @@ export function mergeResultBack(originalRoot: Node, translationRoot: Node): void
           index = +translationNode.getAttribute(attrNameOfNodeIndex);
         }
         const originalNode = originalRoot.childNodes[index];
-        mergeResultBack(originalNode, translationNode);
+        if (originalNode) {
+          mergeResultBack(originalNode, translationNode);
+        }
       }
     }
   }
