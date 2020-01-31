@@ -156,18 +156,18 @@ export function gatherSentences(dom: Element): Element[] {
   return result.filter(it => !!it.innerHTML.trim());
 }
 
-export function mergeResultBack(originalRoot: Node, translationRoot: Element): void {
-  if (translationRoot.children.length === 0) {
+export function mergeResultBack(originalRoot: Node, translationRoot: Node): void {
+  if (isTextNode(translationRoot)) {
+    originalRoot.nodeValue = translationRoot.nodeValue;
+  } else if (isElementNode(translationRoot)) {
     if (translationRoot.hasAttribute(attrNameOfTextWrapper)) {
       originalRoot.nodeValue = translationRoot.textContent;
     } else {
-      originalRoot.textContent = translationRoot.textContent;
+      for (let i = 0; i < translationRoot.childNodes.length; ++i) {
+        const translationNode = translationRoot.childNodes.item(i);
+        const originalNode = originalRoot.childNodes.item(i);
+        mergeResultBack(originalNode, translationNode);
+      }
     }
-  }
-  for (let i = 0; i < translationRoot.children.length; ++i) {
-    const translationNode = translationRoot.children.item(i);
-    const index = +translationNode.getAttribute(attrNameOfNodeIndex);
-    const originalNode = originalRoot.childNodes[index];
-    mergeResultBack(originalNode, translationNode);
   }
 }

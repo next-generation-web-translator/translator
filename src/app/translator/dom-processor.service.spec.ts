@@ -99,7 +99,7 @@ describe('DomProcessor', () => {
     service.setup(dom);
     setTimeout(() => {
       expect(p.innerHTML).toEqual('中Two');
-      expect(h1.innerHTML).toEqual('中One<span>中1<strong>中2</strong>中3</span><!---->');
+      expect(h1.innerHTML).toEqual('中One<span>中1<strong>中2<!----></strong>中3</span><!---->');
       done();
     }, 100);
   });
