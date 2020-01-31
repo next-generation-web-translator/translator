@@ -113,7 +113,7 @@ export function cloneAndWrapText(root: Element): Element {
   result[attrNameOfMarker] = root[attrNameOfMarker];
   for (let i = 0; i < root.childNodes.length; ++i) {
     const node = root.childNodes.item(i);
-    if (isTextNode(node) && hasSibling(node)) {
+    if (isTextNode(node) && hasSibling(node) && !!node.nodeValue.trim()) {
       const wrapped = document.createElement('span');
       wrapped.setAttribute(attrNameOfTextWrapper, '');
       wrapped.setAttribute(attrNameOfNodeIndex, i.toString(10));
