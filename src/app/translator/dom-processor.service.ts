@@ -165,7 +165,11 @@ export function mergeResultBack(originalRoot: Node, translationRoot: Node): void
     } else {
       for (let i = 0; i < translationRoot.childNodes.length; ++i) {
         const translationNode = translationRoot.childNodes.item(i);
-        const originalNode = originalRoot.childNodes.item(i);
+        let index = i;
+        if (isElementNode(translationNode)) {
+          index = +translationNode.getAttribute(attrNameOfNodeIndex);
+        }
+        const originalNode = originalRoot.childNodes[index];
         mergeResultBack(originalNode, translationNode);
       }
     }

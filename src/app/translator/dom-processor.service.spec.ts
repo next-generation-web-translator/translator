@@ -89,12 +89,20 @@ describe('DomProcessor', () => {
     ]);
   });
 
-  it('merge dom', () => {
+  it('merge dom - simply', () => {
     const original = parseHtml('<h1>One<span>1<strong>2<!----></strong>3</span><!----></h1>');
     const translation = parseHtml(`<div __ngwt-marker="nhQmXuNw8KrfhXm4h9yDJ2RLU8Y"><span __text="" __ngwt-node-index="0" __ngwt-node-display="inline">中One</span><span __ngwt-node-index="1" __ngwt-node-display="inline"><span __text="" __ngwt-node-index="0" __ngwt-node-display="inline">中1</span><strong __ngwt-node-index="1" __ngwt-node-display="inline">中2<!----></strong><span __text="" __ngwt-node-index="2" __ngwt-node-display="inline">中3</span></span><!----></div>`);
     mergeResultBack(original, translation);
     expect(original.outerHTML).toBe('<h1>中One<span>中1<strong>中2<!----></strong>中3</span><!----></h1>');
   });
+
+  it('merge dom - re-ordered', () => {
+    const original = parseHtml('<h1>One<span>1<strong>2<!----></strong>3</span><!----></h1>');
+    const translation = parseHtml(`<div __ngwt-marker="nhQmXuNw8KrfhXm4h9yDJ2RLU8Y"><span __text="" __ngwt-node-index="0" __ngwt-node-display="inline">中One</span><span __ngwt-node-index="1" __ngwt-node-display="inline"><span __text="" __ngwt-node-index="2" __ngwt-node-display="inline">中3</span><span __text="" __ngwt-node-index="0" __ngwt-node-display="inline">中1</span><strong __ngwt-node-index="1" __ngwt-node-display="inline">中2<!----></strong></span><!----></div>`);
+    mergeResultBack(original, translation);
+    expect(original.outerHTML).toBe('<h1>中One<span>中1<strong>中2<!----></strong>中3</span><!----></h1>');
+  });
+
   it('translate', (done) => {
     service.setup(dom);
     setTimeout(() => {
