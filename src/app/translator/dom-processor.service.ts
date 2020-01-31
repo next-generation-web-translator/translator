@@ -4,8 +4,17 @@ import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
 import { OriginalModel } from './models/original.model';
 import { TranslationModel } from './models/translation.model';
-import * as hash from 'object-hash';
 import { HttpErrorResponse } from '@angular/common/http';
+import {
+  findFirstBlockLevelAncestor,
+  generateFingerprint,
+  getBlockType,
+  getPathsTo,
+  hasSibling,
+  isElementNode,
+  isInlineStyle,
+  isTextNode,
+} from './dom-utils';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -33,11 +42,10 @@ export class DomProcessor implements OnDestroy {
 
     this.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
       mutationsList.filter(it => it.type === 'childList')
-          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(node)));
+          .forEach((mutation) => mutation.addedNodes.forEach((node) => this.attach(findFirstBlockLevelAncestor(node))));
     });
     this.observer.observe(dom, { attributes: true, childList: true, subtree: true });
-    dom.querySelectorAll(`h1,h2,h3,h4,h5,h6,p,t,[${customTranslateAttributeName}]`)
-        .forEach(element => this.attach(element));
+    this.attach(dom);
   }
 
   ngOnDestroy(): void {
@@ -47,170 +55,119 @@ export class DomProcessor implements OnDestroy {
     this.translate$$.complete();
   }
 
-  shouldTranslate(node: Node): node is Element {
-    if (!isElementNode(node)) {
-      return false;
-    }
-    if (node instanceof HTMLParagraphElement) {
-      return true;
-    }
-    if (node instanceof HTMLHeadingElement) {
-      return true;
-    }
-
-    return node.tagName === 'T' || node.hasAttribute(customTranslateAttributeName);
-  }
-
-  attach(node: Node): void {
-    if (!this.shouldTranslate(node)) {
+  attach(node: Element): void {
+    if (hasAttached(node)) {
       return;
     }
-
-    if (node.hasAttribute(attrNameOfMarker)) {
-      return;
-    }
-
-    const elementToWrap = cloneAndWrapTextNodes(node, 0);
-
-    const id = generateFingerprint(node, elementToWrap.innerHTML);
-    node.setAttribute(attrNameOfMarker, id);
-
-    this.translate$$.next({
-      id,
-      pageUri: location.href,
-      xpath: getPathsTo(node).join('/'),
-      original: elementToWrap.innerHTML.trim(),
+    attachNodeIndexToData(node);
+    const sentences = gatherSentences(cloneAndWrapText(node) as Element);
+    sentences.forEach(sentence => {
+      this.translate$$.next({
+        id: sentence.getAttribute(attrNameOfMarker),
+        pageUri: location.href,
+        xpath: getPathsTo(node).join('/'),
+        original: sentence.innerHTML.trim(),
+      });
     });
   }
 
   private applyResult(result: TranslationModel): void {
-    const originalNode = this.findOriginalNode(result.id);
+    const originalNode = sentenceMap[result.id];
     const translationNode = document.createElement('div');
     translationNode.innerHTML = result.translation;
-    this.mergeDom(originalNode, translationNode);
+    mergeResultBack(originalNode, translationNode);
   }
 
-  private findOriginalNode(resultId: string): Element {
-    return this.dom.querySelector(`[${attrNameOfMarker}="${resultId}"]`);
-  }
-
-  private mergeDom(originalRoot: Node, translationRoot: Element): void {
-    if (translationRoot.children.length === 0) {
-      if (translationRoot.hasAttribute(attrNameOfTextWrapper)) {
-        originalRoot.nodeValue = translationRoot.textContent;
-      } else {
-        originalRoot.textContent = translationRoot.textContent;
-      }
-      return;
-    }
-    for (let i = 0; i < translationRoot.children.length; ++i) {
-      const translationNode = translationRoot.children.item(i);
-      const index = +translationNode.getAttribute(attrNameOfNodeIndex).slice(1);
-      const originalNode = findNodeByIndexData(originalRoot, index);
-      this.mergeDom(originalNode, translationNode);
-    }
-  }
 }
 
-function isTextNode(node: Node): node is Text {
-  return node.nodeType === Node.TEXT_NODE;
-}
-
-function isAttributeNode(node: Node): node is Attr {
-  return node.nodeType === Node.ATTRIBUTE_NODE;
-}
-
-function isCommentNode(node: Node): node is Comment {
-  return node.nodeType === Node.COMMENT_NODE;
-}
-
-function isElementNode(node: Node): node is Element {
-  return node.nodeType === Node.ELEMENT_NODE;
-}
-
-function hasSibling(node: Node): boolean {
-  const parent = node.parentElement;
-  for (let i = 0; i < parent.childNodes.length; ++i) {
-    const subNode = parent.childNodes.item(i);
-    if (subNode !== node && (isTextNode(subNode) || isElementNode(subNode))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-let currentId = 1;
-
-function nextId(): string {
-  currentId++;
-  return '_' + currentId.toString(10);
-}
-
-const customTranslateAttributeName = '__ngwt-translate-me';
-const attrNameOfNodeIndexData = '__ngwt-node-index';
-const attrNameOfNodeIndex = '__index';
+const attrNameOfNodeIndex = '__ngwt-node-index';
+const attrNameOfNodeDisplay = '__ngwt-node-display';
 const attrNameOfTextWrapper = '__text';
-const attrNameOfMarker = '__marker';
+const attrNameOfMarker = '__ngwt-marker';
+const dataNameOfOriginNode = '__ngwt-origin-node';
 
-function indexInParent(node: Node): number {
-  if (!node.parentNode) {
-    return -1;
-  }
-  const siblings = node.parentNode.children;
-  for (let i = 0; i < siblings.length; ++i) {
-    if (siblings.item(i) === node) {
-      return i;
-    }
-  }
-  return -1;
+function hasAttached(node: Element) {
+  return node[attrNameOfNodeIndex] !== undefined;
 }
 
-function getPathsTo(element: Element): string[] {
-  if (element === document.body) {
-    return [];
-  }
-  return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)];
-}
-
-function generateFingerprint(node: Element, html: string) {
-  return toUrlSafe(hash(`${location.href}\n${getPathsTo(node).join('/')}\n${html}`, {
-    encoding: 'base64',
-    algorithm: 'sha1',
-  }));
-}
-
-function toUrlSafe(value: string): string {
-  return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-function findNodeByIndexData(root: Node, index: number): Node {
+export function attachNodeIndexToData(root: Node): void {
   for (let i = 0; i < root.childNodes.length; ++i) {
-    const subNode = root.childNodes.item(i);
-    if (subNode[attrNameOfNodeIndexData] === index) {
-      return subNode;
+    const node = root.childNodes.item(i);
+    node[attrNameOfNodeIndex] = i;
+    if (isElementNode(node)) {
+      const display = getComputedStyle(node).display;
+      node[attrNameOfNodeDisplay] = display;
+      if (!isInlineStyle(display)) {
+        const id = generateFingerprint(node.innerHTML);
+        node[attrNameOfMarker] = id;
+        sentenceMap[id] = node;
+      }
     }
+    attachNodeIndexToData(node);
   }
 }
 
-export function cloneAndWrapTextNodes(node: Element, index: number): Element {
-  const result = document.createElement(node.tagName);
-  result.setAttribute(attrNameOfNodeIndex, `_${index}`);
-  for (let i = 0; i < node.childNodes.length; ++i) {
-    const childNode = node.childNodes.item(i);
-    childNode[attrNameOfNodeIndexData] = i;
-    if (isTextNode(childNode) && hasSibling(childNode)) {
+export function cloneAndWrapText(root: Element): Element {
+  const result = root.cloneNode() as Element;
+  result[dataNameOfOriginNode] = root;
+  result[attrNameOfMarker] = root[attrNameOfMarker];
+  for (let i = 0; i < root.childNodes.length; ++i) {
+    const node = root.childNodes.item(i);
+    if (isTextNode(node) && hasSibling(node)) {
       const wrapped = document.createElement('span');
       wrapped.setAttribute(attrNameOfTextWrapper, '');
-      wrapped.textContent = childNode.nodeValue;
-      wrapped.setAttribute(attrNameOfNodeIndex, `_${i}`);
+      wrapped.setAttribute(attrNameOfNodeIndex, i.toString(10));
+      wrapped.setAttribute(attrNameOfNodeDisplay, 'inline');
+      wrapped.append(node.cloneNode(true));
       result.appendChild(wrapped);
-    } else if (isAttributeNode(childNode) || isCommentNode(childNode)) {
-      // ignore it
-    } else if (isElementNode(childNode)) {
-      result.appendChild(cloneAndWrapTextNodes(childNode, i));
+    } else if (isElementNode(node)) {
+      const clonedChild = cloneAndWrapText(node) as Element;
+      clonedChild.setAttribute(attrNameOfNodeIndex, i.toString(10));
+      clonedChild.setAttribute(attrNameOfNodeDisplay, getBlockType(node));
+      result.appendChild(clonedChild);
     } else {
-      result.append(childNode);
+      result.appendChild(node.cloneNode(true));
     }
   }
   return result;
+}
+
+const sentenceMap: Record<string, Element> = {};
+
+export function gatherSentences(dom: Element): Element[] {
+  const result: Element[] = [];
+  let node = dom.firstChild;
+  let sentence = document.createElement('div');
+  const parent = findFirstBlockLevelAncestor(dom);
+  const id = parent[attrNameOfMarker];
+  sentence.setAttribute(attrNameOfMarker, id);
+  while (node) {
+    if (!isElementNode(node) || ['inline', 'inline-flex', 'inline-block'].includes(node.getAttribute(attrNameOfNodeDisplay))) {
+      sentence.appendChild(node.cloneNode(true));
+    } else {
+      result.push(sentence);
+      const subNodes = gatherSentences(node);
+      result.push(...subNodes);
+      sentence = document.createElement('div');
+    }
+    node = node.nextSibling;
+  }
+  result.push(sentence);
+  return result.filter(it => !!it.innerHTML.trim());
+}
+
+export function mergeResultBack(originalRoot: Node, translationRoot: Element): void {
+  if (translationRoot.children.length === 0) {
+    if (translationRoot.hasAttribute(attrNameOfTextWrapper)) {
+      originalRoot.nodeValue = translationRoot.textContent;
+    } else {
+      originalRoot.textContent = translationRoot.textContent;
+    }
+  }
+  for (let i = 0; i < translationRoot.children.length; ++i) {
+    const translationNode = translationRoot.children.item(i);
+    const index = +translationNode.getAttribute(attrNameOfNodeIndex);
+    const originalNode = originalRoot.childNodes[index];
+    mergeResultBack(originalNode, translationNode);
+  }
 }
