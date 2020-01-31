@@ -62,10 +62,12 @@ export class DomProcessor implements OnDestroy {
     attachNodeIndexToData(node);
     const sentences = gatherSentences(cloneAndWrapText(node) as Element);
     sentences.filter(it => it.hasAttribute(attrNameOfMarker) && !!it.innerHTML.trim()).forEach(sentence => {
+      const id = sentence.getAttribute(attrNameOfMarker);
+      const originalNode = sentenceMap[id];
       this.translate$$.next({
-        id: sentence.getAttribute(attrNameOfMarker),
+        id,
         pageUri: location.href,
-        xpath: getPathsTo(node).join('/'),
+        xpath: '/' + getPathsTo(originalNode).join('/'),
         original: sentence.innerHTML.trim(),
       });
     });
@@ -77,7 +79,6 @@ export class DomProcessor implements OnDestroy {
     translationNode.innerHTML = result.translation;
     mergeResultBack(originalNode, translationNode);
   }
-
 }
 
 const attrNameOfNodeIndex = '__ngwt-node-index';

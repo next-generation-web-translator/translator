@@ -58,7 +58,7 @@ function indexInParent(node: Node): number {
 }
 
 export function getPathsTo(element: Element): string[] {
-  if (element === document.body) {
+  if (!element || element === document.body) {
     return [];
   }
   return [...getPathsTo(element.parentElement), element.tagName, indexInParent(element).toString(10)];
