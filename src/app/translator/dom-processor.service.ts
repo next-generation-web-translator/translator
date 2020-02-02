@@ -1,4 +1,4 @@
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { catchError, mergeMap, tap } from 'rxjs/operators';
 import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
@@ -8,13 +8,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   findFirstBlockLevelAncestor,
   generateFingerprint,
-  getBlockType,
   getPathsTo,
   hasSibling,
   isElementNode,
-  isInlineStyle,
+  isOrContainsBlockElement,
   isTextNode,
 } from './dom-utils';
+import { NodeCloneMap } from './node-clone.map';
 
 @Injectable()
 export class DomProcessor implements OnDestroy {
@@ -24,6 +24,10 @@ export class DomProcessor implements OnDestroy {
   private dom: Element;
   private observer: MutationObserver;
   private translate$$ = new Subject<OriginalModel>();
+
+  get translate$(): Observable<OriginalModel> {
+    return this.translate$$;
+  }
 
   setup(dom: Element = document.body): void {
     this.dom = dom;
@@ -59,11 +63,15 @@ export class DomProcessor implements OnDestroy {
     if (hasAttached(node)) {
       return;
     }
-    attachNodeIndexToData(node);
     const sentences = gatherSentences(cloneAndWrapText(node) as Element);
-    sentences.filter(it => it.hasAttribute(attrNameOfMarker) && !!it.innerHTML.trim()).forEach(sentence => {
-      const id = sentence.getAttribute(attrNameOfMarker);
-      const originalNode = sentenceMap[id];
+    sentences.filter(it => !!it.innerHTML.trim()).forEach(sentence => {
+      const entry = nodeCloneMap.findByCloned(sentence);
+      if (!entry) {
+        return;
+      }
+      const originalNode = entry.original as Element;
+      const id = generateFingerprint(originalNode.innerHTML);
+      entry.id = id;
       this.translate$$.next({
         id,
         pageUri: location.href,
@@ -74,7 +82,7 @@ export class DomProcessor implements OnDestroy {
   }
 
   private applyResult(result: TranslationModel): void {
-    const originalNode = sentenceMap[result.id];
+    const originalNode = nodeCloneMap.findById(result.id).original;
     const translationNode = document.createElement('div');
     translationNode.innerHTML = result.translation;
     mergeResultBack(originalNode, translationNode);
@@ -82,49 +90,30 @@ export class DomProcessor implements OnDestroy {
 }
 
 const attrNameOfNodeIndex = '__ngwt-node-index';
-const attrNameOfNodeDisplay = '__ngwt-node-display';
 const attrNameOfTextWrapper = '__text';
-const attrNameOfMarker = '__ngwt-marker';
-const dataNameOfOriginNode = '__ngwt-origin-node';
 
-function hasAttached(node: Element) {
-  return node[attrNameOfNodeIndex] !== undefined;
-}
+export const nodeCloneMap = new NodeCloneMap();
 
-export function attachNodeIndexToData(root: Node): void {
-  for (let i = 0; i < root.childNodes.length; ++i) {
-    const node = root.childNodes.item(i);
-    node[attrNameOfNodeIndex] = i;
-    if (isElementNode(node)) {
-      const display = getComputedStyle(node).display;
-      node[attrNameOfNodeDisplay] = display;
-      if (!isInlineStyle(display)) {
-        const id = generateFingerprint(node.innerHTML);
-        node[attrNameOfMarker] = id;
-        sentenceMap[id] = node;
-      }
-    }
-    attachNodeIndexToData(node);
-  }
+function hasAttached(node: Element): boolean {
+  return !!nodeCloneMap.findByOriginal(node);
 }
 
 export function cloneAndWrapText(root: Element): Element {
   const result = root.cloneNode() as Element;
-  result[dataNameOfOriginNode] = root;
-  result[attrNameOfMarker] = root[attrNameOfMarker];
+  if (isOrContainsBlockElement(root)) {
+    nodeCloneMap.add(root, result);
+  }
   for (let i = 0; i < root.childNodes.length; ++i) {
     const node = root.childNodes.item(i);
     if (isTextNode(node) && hasSibling(node) && !!node.nodeValue.trim()) {
       const wrapped = document.createElement('span');
       wrapped.setAttribute(attrNameOfTextWrapper, '');
       wrapped.setAttribute(attrNameOfNodeIndex, i.toString(10));
-      wrapped.setAttribute(attrNameOfNodeDisplay, 'inline');
       wrapped.append(node.cloneNode(true));
       result.appendChild(wrapped);
     } else if (isElementNode(node)) {
       const clonedChild = cloneAndWrapText(node) as Element;
       clonedChild.setAttribute(attrNameOfNodeIndex, i.toString(10));
-      clonedChild.setAttribute(attrNameOfNodeDisplay, getBlockType(node));
       result.appendChild(clonedChild);
     } else {
       result.appendChild(node.cloneNode(true));
@@ -133,29 +122,27 @@ export function cloneAndWrapText(root: Element): Element {
   return result;
 }
 
-const sentenceMap: Record<string, Element> = {};
-
 export function gatherSentences(dom: Element): Element[] {
   const result: Element[] = [];
   let node = dom.firstChild;
   let sentence = document.createElement('div');
-  const parent = findFirstBlockLevelAncestor(dom);
-  const id = parent[attrNameOfMarker];
-  if (id) {
-    sentence.setAttribute(attrNameOfMarker, id);
-  }
   while (node) {
-    if (!isElementNode(node) || ['inline', 'inline-flex', 'inline-block'].includes(node.getAttribute(attrNameOfNodeDisplay))) {
+    const entry = nodeCloneMap.findByCloned(node);
+    if (!entry || !isOrContainsBlockElement(entry.original)) {
       sentence.appendChild(node.cloneNode(true));
     } else {
       result.push(sentence);
-      const subNodes = gatherSentences(node);
-      result.push(...subNodes);
+      if (isElementNode(node)) {
+        const subNodes = gatherSentences(node);
+        result.push(...subNodes);
+      }
       sentence = document.createElement('div');
     }
     node = node.nextSibling;
   }
   result.push(sentence);
+  const originalNode = nodeCloneMap.findByCloned(dom).original;
+  nodeCloneMap.add(originalNode, sentence);
   return result.filter(it => !!it.innerHTML.trim());
 }
 

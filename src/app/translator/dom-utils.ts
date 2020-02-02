@@ -2,11 +2,11 @@ import * as hash from 'object-hash';
 
 const inlineStyles = ['inline', 'inline-block', 'inline-flex'];
 
-export function isInlineStyle(display: string) {
+export function isInlineStyle(display: string): boolean {
   return inlineStyles.includes(display);
 }
 
-export function isBlockElement(node: Node): node is Element {
+export function isBlockElement(node: Node): boolean {
   if (!isElementNode(node)) {
     return false;
   }
@@ -14,12 +14,28 @@ export function isBlockElement(node: Node): node is Element {
   return !isInlineStyle(display);
 }
 
-export function isInlineElement(node: Node): node is Element {
+export function isInlineElement(node: Node): boolean {
   if (!isElementNode(node)) {
     return false;
   }
   const display = getBlockType(node);
   return inlineStyles.includes(display);
+}
+
+export function isOrContainsBlockElement(node: Node): boolean {
+  if (!isElementNode(node)) {
+    return false;
+  }
+  if (isBlockElement(node)) {
+    return true;
+  }
+  for (let i = 0; i < node.children.length; ++i) {
+    const subNode = node.children.item(i);
+    if (isOrContainsBlockElement(subNode)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function isTextNode(node: Node): node is Text {
@@ -82,7 +98,7 @@ function toUrlSafeBase64(value: string): string {
 export function findFirstBlockLevelAncestor(node: Node): Element {
   if (!node) {
     return;
-  } else if (isBlockElement(node)) {
+  } else if (isElementNode(node) && isBlockElement(node)) {
     return node;
   } else {
     return findFirstBlockLevelAncestor(node.parentElement);
