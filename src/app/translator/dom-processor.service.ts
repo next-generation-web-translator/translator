@@ -10,9 +10,11 @@ import {
   generateFingerprint,
   getPathsTo,
   hasSibling,
+  isCommentNode,
   isElementNode,
   isOrContainsBlockElement,
   isTextNode,
+  purify,
 } from './dom-utils';
 import { NodeCloneMap } from './node-clone.map';
 
@@ -70,7 +72,7 @@ export class DomProcessor implements OnDestroy {
         return;
       }
       const originalNode = entry.original as Element;
-      const id = generateFingerprint(originalNode.innerHTML);
+      const id = generateFingerprint(originalNode);
       entry.id = id;
       this.translate$$.next({
         id,
@@ -114,8 +116,8 @@ export function cloneAndWrapText(root: Element): Element {
     } else if (isElementNode(node)) {
       const clonedChild = cloneAndWrapText(node) as Element;
       clonedChild.setAttribute(attrNameOfNodeIndex, i.toString(10));
-      result.appendChild(clonedChild);
-    } else {
+      result.appendChild(purify(clonedChild));
+    } else if (!isCommentNode(node)) {
       result.appendChild(node.cloneNode(true));
     }
   }

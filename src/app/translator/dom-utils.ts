@@ -46,6 +46,10 @@ export function isElementNode(node: Node): node is Element {
   return node.nodeType === Node.ELEMENT_NODE;
 }
 
+export function isCommentNode(node: Node): node is Comment {
+  return node.nodeType === Node.COMMENT_NODE;
+}
+
 export function hasSibling(node: Node): boolean {
   const parent = node.parentElement;
   if (!parent) {
@@ -84,8 +88,9 @@ export function getBlockType(node: Element) {
   return getComputedStyle(node).display;
 }
 
-export function generateFingerprint(html: string) {
-  return toUrlSafeBase64(hash(html, {
+export function generateFingerprint(node: Element): string {
+  const clonedNode = node.cloneNode(true) as Element;
+  return toUrlSafeBase64(hash(purify(clonedNode, true).innerHTML.trim(), {
     encoding: 'base64',
     algorithm: 'sha1',
   }));
@@ -103,4 +108,23 @@ export function findFirstBlockLevelAncestor(node: Node): Element {
   } else {
     return findFirstBlockLevelAncestor(node.parentElement);
   }
+}
+
+function shouldPurify(attrName: string = ''): boolean {
+  return attrName.startsWith('_ngcontent-');
+}
+
+export function purify(node: Element, deep = false): Element {
+  for (let i = 0; i < node.attributes.length; ++i) {
+    const attr = node.attributes.item(i);
+    if (shouldPurify(attr.name)) {
+      node.removeAttributeNode(attr);
+    }
+  }
+  if (deep) {
+    for (let i = 0; i < node.children.length; ++i) {
+      purify(node.children.item(i), true);
+    }
+  }
+  return node;
 }

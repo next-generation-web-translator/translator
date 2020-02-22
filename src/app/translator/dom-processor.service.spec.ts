@@ -26,7 +26,7 @@ describe('DomProcessor', () => {
   beforeAll(() => {
     dom = document.createElement('div');
     dom.innerHTML = `<p>Two</p>\
-<div>Three<span>Four</span>Five</div>\
+<div>Three<span _ngcontent-12>Four</span>Five</div>\
 <h1>One<span>1<strong>2<!----></strong>3</span><!----></h1>\
 <app-custom><p>Six</p></app-custom>
 `;
@@ -64,12 +64,12 @@ describe('DomProcessor', () => {
 
   it('should clone and wrap all elements', () => {
     const cloned = cloneAndWrapText(dom) as Element;
-    expect(cloned.innerHTML).toEqual(`<p __ngwt-node-index="0">Two</p><div __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">Three</span><span __ngwt-node-index="1">Four</span><span __text="" __ngwt-node-index="2">Five</span></div><h1 __ngwt-node-index="2"><span __text="" __ngwt-node-index="0">One</span><span __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">1</span><strong __ngwt-node-index="1">2<!----></strong><span __text="" __ngwt-node-index="2">3</span></span><!----></h1><app-custom __ngwt-node-index="3"><p __ngwt-node-index="0">Six</p></app-custom>
+    expect(cloned.innerHTML).toEqual(`<p __ngwt-node-index="0">Two</p><div __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">Three</span><span __ngwt-node-index="1">Four</span><span __text="" __ngwt-node-index="2">Five</span></div><h1 __ngwt-node-index="2"><span __text="" __ngwt-node-index="0">One</span><span __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">1</span><strong __ngwt-node-index="1">2</strong><span __text="" __ngwt-node-index="2">3</span></span></h1><app-custom __ngwt-node-index="3"><p __ngwt-node-index="0">Six</p></app-custom>
 `);
     expect(nodeCloneMap.items.map(it => (it.original as Element).outerHTML)).toEqual([
       '<p>Two</p>',
-      '<div>Three<span>Four</span>Five</div>',
-      '<div><p>Two</p><div>Three<span>Four</span>Five</div><h1>One<span>1<strong>2<!----></strong>3</span><!----></h1><app-custom><p>Six</p></app-custom>\n</div>',
+      '<div>Three<span _ngcontent-12="">Four</span>Five</div>',
+      '<div><p>Two</p><div>Three<span _ngcontent-12="">Four</span>Five</div><h1>One<span>1<strong>2<!----></strong>3</span><!----></h1><app-custom><p>Six</p></app-custom>\n</div>',
       '<h1>One<span>1<strong>2<!----></strong>3</span><!----></h1>',
       '<app-custom><p>Six</p></app-custom>',
       '<p>Six</p>',
@@ -90,7 +90,7 @@ describe('DomProcessor', () => {
     expect(elements.map(it => it.outerHTML)).toEqual([
       '<div>Two</div>',
       '<div><span __text="" __ngwt-node-index="0">Three</span><span __ngwt-node-index="1">Four</span><span __text="" __ngwt-node-index="2">Five</span></div>',
-      '<div><span __text="" __ngwt-node-index="0">One</span><span __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">1</span><strong __ngwt-node-index="1">2<!----></strong><span __text="" __ngwt-node-index="2">3</span></span><!----></div>',
+      '<div><span __text="" __ngwt-node-index="0">One</span><span __ngwt-node-index="1"><span __text="" __ngwt-node-index="0">1</span><strong __ngwt-node-index="1">2</strong><span __text="" __ngwt-node-index="2">3</span></span></div>',
       '<div>Six</div>',
     ]);
   });
