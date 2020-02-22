@@ -66,7 +66,7 @@ export class DomProcessor implements OnDestroy {
       return;
     }
     const sentences = gatherSentences(cloneAndWrapText(node) as Element);
-    sentences.filter(it => !!it.innerHTML.trim()).forEach(sentence => {
+    sentences.filter(it => !!it.textContent.trim()).forEach(sentence => {
       const entry = nodeCloneMap.findByCloned(sentence);
       if (!entry) {
         return;
