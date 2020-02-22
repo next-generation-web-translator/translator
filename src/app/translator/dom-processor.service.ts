@@ -100,6 +100,10 @@ function hasAttached(node: Element): boolean {
   return !!nodeCloneMap.findByOriginal(node);
 }
 
+function isLigature(clonedChild: Element): boolean {
+  return clonedChild.classList.contains('material-icons') || getComputedStyle(clonedChild).fontFamily === 'Material Icons';
+}
+
 export function cloneAndWrapText(root: Element): Element {
   const result = root.cloneNode() as Element;
   if (isOrContainsBlockElement(root)) {
@@ -115,6 +119,9 @@ export function cloneAndWrapText(root: Element): Element {
       result.appendChild(wrapped);
     } else if (isElementNode(node)) {
       const clonedChild = cloneAndWrapText(node) as Element;
+      if (isLigature(clonedChild)) {
+        clonedChild.setAttribute('translate', 'no');
+      }
       clonedChild.setAttribute(attrNameOfNodeIndex, i.toString(10));
       result.appendChild(purify(clonedChild));
     } else if (!isCommentNode(node)) {
