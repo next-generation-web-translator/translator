@@ -66,7 +66,7 @@ export class DomProcessor implements OnDestroy {
       return;
     }
     const sentences = gatherSentences(cloneAndWrapText(node) as Element);
-    sentences.filter(it => !!it.textContent.trim()).forEach(sentence => {
+    sentences.forEach(sentence => {
       const entry = nodeCloneMap.findByCloned(sentence);
       if (!entry) {
         return;
@@ -152,7 +152,7 @@ export function gatherSentences(dom: Element): Element[] {
   result.push(sentence);
   const originalNode = nodeCloneMap.findByCloned(dom).original;
   nodeCloneMap.add(originalNode, sentence);
-  return result.filter(it => !!it.innerHTML.trim());
+  return result.filter(it => !!it.textContent.trim());
 }
 
 export function mergeResultBack(originalRoot: Node, translationRoot: Node): void {
