@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --proxy-config=./proxy-config.js --port=4210 --open",
-    "build": "ng build --prod",
+    "build": "ng build --prod --no-extract-css",
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e"

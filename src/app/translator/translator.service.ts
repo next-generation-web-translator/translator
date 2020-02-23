@@ -4,9 +4,7 @@ import { TranslationModel } from './models/translation.model';
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable()
 export class Translator {
   constructor(protected http: HttpClient) {
   }
