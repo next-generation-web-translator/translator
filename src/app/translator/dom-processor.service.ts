@@ -3,7 +3,6 @@ import { catchError, mergeMap, tap } from 'rxjs/operators';
 import { Translator } from './translator.service';
 import { Injectable, OnDestroy } from '@angular/core';
 import { OriginalModel } from './models/original.model';
-import { TranslationModel } from './models/translation.model';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   findFirstBlockLevelAncestor,
@@ -42,7 +41,12 @@ export class DomProcessor implements OnDestroy {
                 throw error;
               }
             }),
-            tap((result) => this.applyResult(result)),
+            tap((result) => {
+              const originalNode = nodeCloneMap.findById(result.id).original;
+              const translationNode = document.createElement('div');
+              translationNode.innerHTML = result.translation;
+              mergeResultBack(originalNode, translationNode);
+            }),
         )),
     ).subscribe();
 
@@ -83,12 +87,6 @@ export class DomProcessor implements OnDestroy {
     });
   }
 
-  private applyResult(result: TranslationModel): void {
-    const originalNode = nodeCloneMap.findById(result.id).original;
-    const translationNode = document.createElement('div');
-    translationNode.innerHTML = result.translation;
-    mergeResultBack(originalNode, translationNode);
-  }
 }
 
 const attrNameOfNodeIndex = '__ngwt-node-index';
@@ -176,3 +174,4 @@ export function mergeResultBack(originalRoot: Node, translationRoot: Node): void
     }
   }
 }
+
