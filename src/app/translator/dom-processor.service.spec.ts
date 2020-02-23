@@ -114,9 +114,9 @@ describe('DomProcessor', () => {
     setTimeout(() => {
       expect(p.innerHTML).toEqual('中Two');
       expect(h1.innerHTML).toEqual('中One<span>中1<strong>中2<!----></strong>中3</span><!---->');
-      expect(div.innerHTML).toEqual('中Three<span>中Four</span>中Five');
+      expect(div.innerHTML).toEqual('中Three<span _ngcontent-12="">中Four</span>中Five');
       expect(custom.innerHTML).toEqual('<p>中Six</p>');
       done();
-    }, 100);
+    }, 300);
   });
 });
